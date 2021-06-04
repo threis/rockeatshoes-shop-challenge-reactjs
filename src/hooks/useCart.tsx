@@ -50,6 +50,7 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
       const updatedCart = cart.map((cartItem) => {
         if (cartItem.id === productId) {
           productExist = true;
+
           return {
             ...cartItem,
             amount: cartItem.amount + 1,
@@ -60,25 +61,36 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
       });
 
       if (productExist) {
+        const amount = updatedCart.filter(
+          (product) => product.id === productId
+        )[0].amount;
+
+        if (!(await validateStockAmount(productId, amount))) {
+          return;
+        }
+
         setCart(updatedCart);
       } else {
+        if (!(await validateStockAmount(productId, 1))) {
+          return;
+        }
         const newProduct = {
           ...product,
           amount: 1,
         };
         setCart([...updatedCart, newProduct]);
       }
-    } catch (err) {
-      // TODO
-      console.log(err);
+    } catch {
+      toast.error("Erro na adição do produto");
     }
   };
 
   const removeProduct = (productId: number) => {
     try {
-      // TODO
+      const cartUpdated = cart.filter((product) => product.id !== productId);
+      setCart(cartUpdated);
     } catch {
-      // TODO
+      toast.error("Erro na remoção do produto");
     }
   };
 
@@ -87,11 +99,34 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     amount,
   }: UpdateProductAmount) => {
     try {
-      // TODO
+      if (amount <= 0) return;
+
+      if (!(await validateStockAmount(productId, amount))) {
+        return;
+      }
+
+      const cartUpdated = cart.map((product) => {
+        if (product.id === productId) {
+          return { ...product, amount };
+        }
+        return product;
+      });
+      setCart(cartUpdated);
     } catch {
-      // TODO
+      toast.error("Erro na alteração de quantidade do produto");
     }
   };
+
+  async function validateStockAmount(productId: number, amount: number) {
+    const response = await api.get(`/stock/${productId}`);
+    const stock = response.data;
+
+    if (amount > stock.amount || 0) {
+      toast.error("Quantidade solicitada fora de estoque");
+      return false;
+    }
+    return true;
+  }
 
   return (
     <CartContext.Provider
